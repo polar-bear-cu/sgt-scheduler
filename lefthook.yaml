@@ -1,0 +1,24 @@
+commit-msg:
+  commands:
+    conventional:
+      run: sh scripts/commit-msg.sh {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      glob: "*.go"
+      run: golangci-lint fmt
+      stage_fixed: true
+
+pre-push:
+  parallel: false
+  commands:
+    tidy:
+      run: go mod tidy && git diff --exit-code go.mod go.sum
+    lint:
+      run: golangci-lint run
+    build:
+      run: go build ./...
+    test:
+      run: go test ./...
