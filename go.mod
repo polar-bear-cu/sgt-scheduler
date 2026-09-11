@@ -4,6 +4,7 @@ go 1.26.5
 
 require (
 	github.com/gin-gonic/gin v1.12.0
+	github.com/joho/godotenv v1.5.1
 	github.com/polar-bear-cu/sgt-proto v0.2.0
 	github.com/rabbitmq/amqp091-go v1.14.0
 	github.com/robfig/cron/v3 v3.0.1
