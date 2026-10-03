@@ -10,6 +10,7 @@ type Config struct {
 	Port string
 
 	ReminderCron string
+	RolloverCron string
 	PublicURL    string
 
 	SubscriptionAddr string
@@ -23,6 +24,7 @@ func Load() *Config {
 		Port: env("PORT", "8080"),
 
 		ReminderCron: env("REMINDER_CRON", "0 9 * * *"),
+		RolloverCron: env("ROLLOVER_CRON", "0 0 * * *"),
 		PublicURL:    env("PUBLIC_URL", "http://localhost:8000"),
 
 		SubscriptionAddr: env("SUBSCRIPTION_SERVICE_ADDR", "localhost:50051"),

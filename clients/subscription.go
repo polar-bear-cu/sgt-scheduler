@@ -43,3 +43,11 @@ func (c *SubscriptionClient) ListDueReminders(ctx context.Context, date string) 
 	}
 	return out, nil
 }
+
+func (c *SubscriptionClient) AdvanceBillingDates(ctx context.Context, date string) (advanced, converted int64, err error) {
+	resp, err := c.rpc.AdvanceBillingDates(ctx, &subscriptionv1.AdvanceBillingDatesRequest{Date: date})
+	if err != nil {
+		return 0, 0, err
+	}
+	return resp.GetAdvancedCount(), resp.GetTrialsConvertedCount(), nil
+}

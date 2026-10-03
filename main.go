@@ -66,8 +66,19 @@ func main() {
 	subs := clients.NewSubscriptionClient(subConn)
 	users := clients.NewUserClient(userConn)
 	reminder := usecases.NewBillingReminder(subs, users, pub, loc, cfg.PublicURL)
+	rollover := usecases.NewBillingRollover(subs, loc)
 
 	sched := scheduler.New(loc)
+	if err := sched.AddJob(cfg.RolloverCron, time.Minute, func(ctx context.Context) {
+		res, err := rollover.Run(ctx, time.Now())
+		if err != nil {
+			log.Printf("billing rollover failed: date=%s err=%v", res.Date, err)
+			return
+		}
+		log.Printf("billing rollover: date=%s advanced=%d trials_converted=%d", res.Date, res.Advanced, res.TrialsConverted)
+	}); err != nil {
+		log.Fatal(err)
+	}
 	if err := sched.AddJob(cfg.ReminderCron, 2*time.Minute, func(ctx context.Context) {
 		start := time.Now()
 		res, err := reminder.Run(ctx, start)
