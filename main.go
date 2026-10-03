@@ -25,6 +25,11 @@ import (
 func main() {
 	cfg := config.Load()
 
+	loc, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -46,6 +51,13 @@ func main() {
 	}
 	defer func() { _ = rmqConn.Close() }()
 
+	rmqClosed := rmqConn.NotifyClose(make(chan *amqp.Error, 1))
+	go func() {
+		if err, ok := <-rmqClosed; ok {
+			log.Fatalf("rabbitmq connection lost: %v", err)
+		}
+	}()
+
 	pub, err := publisher.NewRabbitMQPublisher(rmqConn)
 	if err != nil {
 		log.Fatal(err)
@@ -53,16 +65,17 @@ func main() {
 
 	subs := clients.NewSubscriptionClient(subConn)
 	users := clients.NewUserClient(userConn)
-	uc := usecases.NewBillingReminder(subs, users, pub)
+	reminder := usecases.NewBillingReminder(subs, users, pub, loc, cfg.PublicURL)
 
-	sched := scheduler.New()
-	if err := sched.AddJob(cfg.CronSpec, func(ctx context.Context) {
-		sent, err := uc.Run(ctx, cfg.WithinHours)
+	sched := scheduler.New(loc)
+	if err := sched.AddJob(cfg.ReminderCron, 2*time.Minute, func(ctx context.Context) {
+		start := time.Now()
+		res, err := reminder.Run(ctx, start)
+		log.Printf("reminder check: date=%s due=%d published=%d failed=%d took=%s",
+			res.Date, res.Due, res.Published, res.Failed, time.Since(start).Round(time.Millisecond))
 		if err != nil {
-			log.Printf("billing reminder run: sent=%d err=%v", sent, err)
-			return
+			log.Printf("reminder check errors: %v", err)
 		}
-		log.Printf("billing reminder run: sent=%d", sent)
 	}); err != nil {
 		log.Fatal(err)
 	}
