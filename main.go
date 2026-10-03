@@ -45,6 +45,12 @@ func main() {
 	}
 	defer func() { _ = userConn.Close() }()
 
+	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = authConn.Close() }()
+
 	rmqConn, err := amqp.Dial(cfg.RabbitMQURL)
 	if err != nil {
 		log.Fatal(err)
@@ -67,8 +73,19 @@ func main() {
 	users := clients.NewUserClient(userConn)
 	reminder := usecases.NewBillingReminder(subs, users, pub, loc, cfg.PublicURL)
 	rollover := usecases.NewBillingRollover(subs, loc)
+	cleanup := usecases.NewTokenCleanup(clients.NewAuthClient(authConn))
 
 	sched := scheduler.New(loc)
+	if err := sched.AddJob(cfg.CleanupCron, 30*time.Second, func(ctx context.Context) {
+		deleted, err := cleanup.Run(ctx)
+		if err != nil {
+			log.Printf("refresh token cleanup failed: %v", err)
+			return
+		}
+		log.Printf("refresh token cleanup: deleted=%d", deleted)
+	}); err != nil {
+		log.Fatal(err)
+	}
 	if err := sched.AddJob(cfg.RolloverCron, time.Minute, func(ctx context.Context) {
 		res, err := rollover.Run(ctx, time.Now())
 		if err != nil {

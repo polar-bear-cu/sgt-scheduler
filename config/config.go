@@ -11,10 +11,12 @@ type Config struct {
 
 	ReminderCron string
 	RolloverCron string
+	CleanupCron  string
 	PublicURL    string
 
 	SubscriptionAddr string
 	UserServiceAddr  string
+	AuthServiceAddr  string
 	RabbitMQURL      string
 }
 
@@ -25,10 +27,12 @@ func Load() *Config {
 
 		ReminderCron: env("REMINDER_CRON", "0 9 * * *"),
 		RolloverCron: env("ROLLOVER_CRON", "0 0 * * *"),
+		CleanupCron:  env("CLEANUP_CRON", "0 0 * * *"),
 		PublicURL:    env("PUBLIC_URL", "http://localhost:8000"),
 
 		SubscriptionAddr: env("SUBSCRIPTION_SERVICE_ADDR", "localhost:50051"),
 		UserServiceAddr:  env("USER_SERVICE_ADDR", "localhost:50052"),
+		AuthServiceAddr:  env("AUTH_SERVICE_ADDR", "localhost:50053"),
 		RabbitMQURL:      env("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
 	}
 }
