@@ -17,15 +17,37 @@ func NewSubscriptionClient(conn *grpc.ClientConn) *SubscriptionClient {
 	return &SubscriptionClient{rpc: subscriptionv1.NewSubscriptionServiceClient(conn)}
 }
 
-func (c *SubscriptionClient) ListUpcomingForBilling(ctx context.Context, withinHours int32) ([]usecases.Subscription, error) {
-	resp, err := c.rpc.GetUpcomingForBilling(ctx, &subscriptionv1.GetUpcomingForBillingRequest{WithinHours: withinHours})
+func (c *SubscriptionClient) ListDueReminders(ctx context.Context, date string) ([]usecases.DueReminder, error) {
+	resp, err := c.rpc.ListDueReminders(ctx, &subscriptionv1.ListDueRemindersRequest{Date: date})
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]usecases.Subscription, 0, len(resp.GetSubscription()))
-	for _, sub := range resp.GetSubscription() {
-		out = append(out, usecases.Subscription{UserID: sub.GetUserId(), Name: sub.GetName()})
+	out := make([]usecases.DueReminder, 0, len(resp.GetReminders()))
+	for _, r := range resp.GetReminders() {
+		sub := r.GetSubscription()
+		d := usecases.DueReminder{
+			SubscriptionID:  sub.GetId(),
+			UserID:          sub.GetUserId(),
+			Name:            sub.GetName(),
+			Cost:            sub.GetCost(),
+			NextBillingDate: sub.GetBillingDate().AsTime(),
+			BillingDue:      r.GetBillingDue(),
+			TrialEndDue:     r.GetTrialEndDue(),
+		}
+		if sub.GetFtEndDate() != nil {
+			ft := sub.GetFtEndDate().AsTime()
+			d.FtEndDate = &ft
+		}
+		out = append(out, d)
 	}
 	return out, nil
+}
+
+func (c *SubscriptionClient) AdvanceBillingDates(ctx context.Context, date string) (advanced, converted int64, err error) {
+	resp, err := c.rpc.AdvanceBillingDates(ctx, &subscriptionv1.AdvanceBillingDatesRequest{Date: date})
+	if err != nil {
+		return 0, 0, err
+	}
+	return resp.GetAdvancedCount(), resp.GetTrialsConvertedCount(), nil
 }

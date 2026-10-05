@@ -25,6 +25,11 @@ import (
 func main() {
 	cfg := config.Load()
 
+	loc, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -40,11 +45,24 @@ func main() {
 	}
 	defer func() { _ = userConn.Close() }()
 
+	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = authConn.Close() }()
+
 	rmqConn, err := amqp.Dial(cfg.RabbitMQURL)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() { _ = rmqConn.Close() }()
+
+	rmqClosed := rmqConn.NotifyClose(make(chan *amqp.Error, 1))
+	go func() {
+		if err, ok := <-rmqClosed; ok {
+			log.Fatalf("rabbitmq connection lost: %v", err)
+		}
+	}()
 
 	pub, err := publisher.NewRabbitMQPublisher(rmqConn)
 	if err != nil {
@@ -53,16 +71,39 @@ func main() {
 
 	subs := clients.NewSubscriptionClient(subConn)
 	users := clients.NewUserClient(userConn)
-	uc := usecases.NewBillingReminder(subs, users, pub)
+	reminder := usecases.NewBillingReminder(subs, users, pub, loc, cfg.PublicURL)
+	rollover := usecases.NewBillingRollover(subs, loc)
+	cleanup := usecases.NewTokenCleanup(clients.NewAuthClient(authConn))
 
-	sched := scheduler.New()
-	if err := sched.AddJob(cfg.CronSpec, func(ctx context.Context) {
-		sent, err := uc.Run(ctx, cfg.WithinHours)
+	sched := scheduler.New(loc)
+	if err := sched.AddJob(cfg.CleanupCron, 30*time.Second, func(ctx context.Context) {
+		deleted, err := cleanup.Run(ctx)
 		if err != nil {
-			log.Printf("billing reminder run: sent=%d err=%v", sent, err)
+			log.Printf("refresh token cleanup failed: %v", err)
 			return
 		}
-		log.Printf("billing reminder run: sent=%d", sent)
+		log.Printf("refresh token cleanup: deleted=%d", deleted)
+	}); err != nil {
+		log.Fatal(err)
+	}
+	if err := sched.AddJob(cfg.RolloverCron, time.Minute, func(ctx context.Context) {
+		res, err := rollover.Run(ctx, time.Now())
+		if err != nil {
+			log.Printf("billing rollover failed: date=%s err=%v", res.Date, err)
+			return
+		}
+		log.Printf("billing rollover: date=%s advanced=%d trials_converted=%d", res.Date, res.Advanced, res.TrialsConverted)
+	}); err != nil {
+		log.Fatal(err)
+	}
+	if err := sched.AddJob(cfg.ReminderCron, 2*time.Minute, func(ctx context.Context) {
+		start := time.Now()
+		res, err := reminder.Run(ctx, start)
+		log.Printf("reminder check: date=%s due=%d published=%d failed=%d took=%s",
+			res.Date, res.Due, res.Published, res.Failed, time.Since(start).Round(time.Millisecond))
+		if err != nil {
+			log.Printf("reminder check errors: %v", err)
+		}
 	}); err != nil {
 		log.Fatal(err)
 	}
