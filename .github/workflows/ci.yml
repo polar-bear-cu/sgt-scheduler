@@ -27,7 +27,7 @@ jobs:
 
   push-image:
     needs: check
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -44,5 +44,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/polar-bear-cu/sgt-scheduler:latest
+            ghcr.io/polar-bear-cu/sgt-scheduler:${{ github.ref_name }}
             ghcr.io/polar-bear-cu/sgt-scheduler:${{ github.sha }}
