@@ -32,6 +32,8 @@ type ReminderJob struct {
 	To             string
 	Title          string
 	Content        string
+	InAppTitle     string
+	InAppContent   string
 }
 
 type SubscriptionSource interface {
@@ -120,20 +122,23 @@ func (u *BillingReminderUsecase) buildJob(d DueReminder, email string) ReminderJ
 	day := event.In(u.loc).Format(time.DateOnly)
 	link := u.publicURL + "/home"
 
-	var title, content string
+	var title, content, label string
 	switch kind {
 	case KindTrialEndAndBilling:
 		title = "Free trial ends and first charge: " + name
 		content = fmt.Sprintf("Your free trial of %s ends on %s, and the first charge of %.2f THB is expected on the same day.\n\nReview it: %s",
 			name, day, d.Cost, link)
+		label = "Free Trial Over & First Payment"
 	case KindTrialEnd:
 		title = "Free trial ending: " + name
 		content = fmt.Sprintf("Your free trial of %s ends on %s. After that it is expected to cost %.2f THB per billing cycle.\n\nReview it: %s",
 			name, day, d.Cost, link)
+		label = "Free Trial Almost Over"
 	default:
 		title = "Upcoming charge: " + name
 		content = fmt.Sprintf("%s is expected to charge %.2f THB on %s.\n\nReview it: %s",
 			name, d.Cost, day, link)
+		label = "Next Payment Upcoming"
 	}
 
 	return ReminderJob{
@@ -143,5 +148,7 @@ func (u *BillingReminderUsecase) buildJob(d DueReminder, email string) ReminderJ
 		To:             email,
 		Title:          title,
 		Content:        content,
+		InAppTitle:     name,
+		InAppContent:   label + ", " + event.In(u.loc).Format("2 January 2006"),
 	}
 }
