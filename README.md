@@ -32,15 +32,26 @@ cronjob รายวัน 3 ตัว: ล้าง refresh token ที่ใ�
   "subscription_id": "<subscription_id>",
   "to": "user@example.com",
   "title": "Upcoming charge: Netflix",
-  "content": "Netflix is expected to charge 419.00 THB on 2026-10-06.\n\nReview it: http://localhost:8000/home"
+  "content": "Netflix is expected to charge 419.00 THB on 2026-10-06.\n\nReview it: http://localhost:8000/home",
+  "inapp_title": "Netflix",
+  "inapp_content": "Next Payment Upcoming, 6 October 2026"
 }
 ```
 
-| Field                      | Meaning                                                                                      |
-| -------------------------- | -------------------------------------------------------------------------------------------- |
-| `reminder_id`              | `<subscription_id>:<kind>:<event date>` ค่าเดิมเสมอสำหรับ event เดียวกัน (idempotency key)   |
-| `kind` (ใน id)             | `billing` \| `trial_end` \| `trial_end_and_billing` (trial หมดวันเดียวกับตัดเงิน = เมลเดียว) |
-| `to` / `title` / `content` | ที่ noti ใช้ส่งเมล - ชื่อ subscription ถูกตัด CR/LF ก่อนใส่ title                            |
+| Field                           | Meaning                                                                                      |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `reminder_id`                   | `<subscription_id>:<kind>:<event date>` ค่าเดิมเสมอสำหรับ event เดียวกัน (idempotency key)   |
+| `kind` (ใน id)                  | `billing` \| `trial_end` \| `trial_end_and_billing` (trial หมดวันเดียวกับตัดเงิน = เมลเดียว) |
+| `to` / `title` / `content`      | ที่ noti ใช้ส่งเมล - ชื่อ subscription ถูกตัด CR/LF ก่อนใส่ title                            |
+| `inapp_title` / `inapp_content` | ข้อความ in-app ที่ noti บันทึกตามนี้ - ชื่อ subscription / `<label>, <วันที่ event>`         |
+
+label ของ `inapp_content` ตาม kind (วันที่รูปแบบ `2 January 2006` เวลาไทย):
+
+| kind                    | label                             |
+| ----------------------- | --------------------------------- |
+| `billing`               | `Next Payment Upcoming`           |
+| `trial_end`             | `Free Trial Almost Over`          |
+| `trial_end_and_billing` | `Free Trial Over & First Payment` |
 
 - message เป็น persistent (`delivery_mode: 2`) และ `message_id` = `reminder_id`
 - publish แบบ publisher confirms: นับว่าส่งแล้วเมื่อ RabbitMQ ack เท่านั้น
