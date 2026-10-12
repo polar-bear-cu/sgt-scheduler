@@ -21,6 +21,8 @@ type reminderMessage struct {
 	To             string `json:"to"`
 	Title          string `json:"title"`
 	Content        string `json:"content"`
+	InAppTitle     string `json:"inapp_title"`
+	InAppContent   string `json:"inapp_content"`
 }
 
 type RabbitMQPublisher struct {
@@ -49,6 +51,8 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, job usecases.ReminderJo
 		To:             job.To,
 		Title:          job.Title,
 		Content:        job.Content,
+		InAppTitle:     job.InAppTitle,
+		InAppContent:   job.InAppContent,
 	})
 	if err != nil {
 		return err
